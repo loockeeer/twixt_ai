@@ -32,7 +32,7 @@ tree_list_t *mc_tl_create(tree_t *this) {
   if (new == NULL) return NULL;
   new->this = this;
   new->next = NULL;
-  new->length = 0;
+  new->length = 1;
   new->protected = false;
   return new;
 }
@@ -48,7 +48,7 @@ tree_list_t *mc_tl_append(tree_list_t *tl, tree_t *tree) {
 
 int mc_tl_length(const tree_list_t *tl) {
   if (tl == NULL) return 0;
-  else return tl->length;
+  return tl->length;
 }
 
 void mc_tl_destroy(tree_list_t *tl) {
@@ -94,7 +94,7 @@ double mc_calculate_action(tree_t *tree) {
   return tree->label.prior;
 }
 
-outcome_t continue_strategy(const board_t *board, player_t player) {
+outcome_t continue_strategy(board_t *board, player_t player) {
   while (true) {
     position_t pos = twixt_random_move(board, player);
     if (!twixt_play(board, player, pos))
@@ -179,15 +179,56 @@ tree_t *get_max_visits(tree_list_t *tl) {
   return best->this;
 }
 
-void expand(const board_t *board, tree_t *tree, player_t player) {
+int random_int(int max) {
+  return (int) (random() % (long) max);
+}
+
+tree_list_t *knuth_shuffle(tree_list_t *tl)
+{
+  if (tl == NULL) return tl;
+  int length = tl->length;
+  tree_t **arrayed_list = malloc(sizeof(tree_t*) * length);
+  bool *arrayed_list_protected = malloc(sizeof(bool) * length);
+  int i = 0;
+  for (tree_list_t *cursor = tl; cursor != NULL; cursor = cursor->next) {
+    arrayed_list[i] = cursor->this;
+    arrayed_list_protected[i] = cursor->protected;
+    cursor->protected = true;
+    i++;
+  }
+  for (i = 0; i < length; i++) {
+    tree_t *tmp = arrayed_list[i];
+    int j = random_int(i+1);
+    arrayed_list[i] = arrayed_list[j];
+    arrayed_list[j] = tmp;
+    bool tmp2 = arrayed_list_protected[i];
+    arrayed_list_protected[i] = arrayed_list[j];
+    arrayed_list_protected[j] = tmp2;
+  }
+
+  mc_tl_destroy(tl);
+  tl = NULL;
+  for (i = 0; i < length; i++) {
+    tl = mc_tl_append(tl, arrayed_list[i]);
+    tl->protected = arrayed_list_protected[i];
+  }
+
+  free(arrayed_list_protected);
+  free(arrayed_list);
+  return tl;
+}
+
+void expand(board_t *board, tree_t *tree, player_t player) {
   assert(tree != NULL);
   tree_t *cursor = tree;
   while (mc_tl_length(cursor->children) > 0) {
+    cursor->children = knuth_shuffle(cursor->children);
     cursor = get_max_visits(cursor->children);
     twixt_play(board, player, cursor->label.move);
     player = player == RED ? BLACK : RED;
   }
   cursor->children = expand_leaf(board, player);
+  cursor->children = knuth_shuffle(cursor->children);
 }
 
 typedef struct {

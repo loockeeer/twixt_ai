@@ -160,7 +160,7 @@ static gboolean on_mouse_click(GtkWidget *widget, GdkEventButton *event, gpointe
                         exit(1);
                     }
                     mc_advance_tree(&tree, (position_t){i, j});
-                    position_t move = mc_search(200, 200, board, &tree, BLACK);
+                    position_t move = mc_search(500, 500, board, &tree, BLACK);
                     twixt_play(board, BLACK, move);
                     o = twixt_check_winner(board);
                     if (o != ONGOING) {
