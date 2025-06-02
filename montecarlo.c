@@ -109,10 +109,10 @@ outcome_t continue_strategy(board_t *board, player_t player) {
 }
 
 int get_outcome_value(outcome_t o, player_t opt) {
-  if ((o == RED_WINS && opt == RED) || (o == BLACK_WINS && opt == BLACK)) return 2;
+  if ((o == RED_WINS && opt == RED) || (o == BLACK_WINS && opt == BLACK)) return 5;
   if (o == DRAW) return -1;
   if (o == ONGOING) return 0;
-  return -2;
+  return -5;
 }
 
 tree_t *get_max_action(tree_list_t *tl) {

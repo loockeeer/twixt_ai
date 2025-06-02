@@ -11,7 +11,9 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED gtk+-3.0)
 pkg_check_modules(CAIRO REQUIRED cairo)
 
-add_executable(twixt_ai main.c montecarlo.c twixt.c)
+add_executable(twixt_ai main.c montecarlo.c twixt.c
+        serializer.h
+        serializer.c)
 # Ajouter les répertoires d'inclusion et les bibliothèques
 target_include_directories(twixt_ai PRIVATE ${GTK_INCLUDE_DIRS} ${CAIRO_INCLUDE_DIRS})
 target_link_libraries(twixt_ai PRIVATE ${GTK_LIBRARIES} ${CAIRO_LIBRARIES})

@@ -8,9 +8,6 @@
 #include"montecarlo.h"
 
 
-#include <cairo.h>
-#include <gtk/gtk.h>
-#include <stdlib.h>
 #include <math.h>
 
 #define CELL_SIZE 35
@@ -146,6 +143,7 @@ int distance(int x, int y, int u, int v) {
 
 static gboolean on_mouse_click(GtkWidget *widget, GdkEventButton *event, gpointer data) {
     printf("clicked : %d,%d\n", (int)event->x, (int)event->y);
+    bool t = false;
     for (int i=0; i<BOARD_SIZE; i++) {
         for (int j=0; j<BOARD_SIZE; j++) {
             int x = (i + BORDER_OFFSET) * CELL_SIZE;
@@ -169,9 +167,21 @@ static gboolean on_mouse_click(GtkWidget *widget, GdkEventButton *event, gpointe
                         if (o == DRAW) printf("draw\n");
                         exit(1);
                     }
+                    t = true;
                 }
                 break;
             }
+        }
+    }
+    if (!t) {
+        position_t move = mc_search(500, 500, board, &tree, BLACK);
+        twixt_play(board, BLACK, move);
+        outcome_t o = twixt_check_winner(board);
+        if (o != ONGOING) {
+            if (o == RED_WINS) printf("red\n");
+            if (o == BLACK_WINS) printf("black\n");
+            if (o == DRAW) printf("draw\n");
+            exit(1);
         }
     }
     gtk_widget_queue_draw(widget);
