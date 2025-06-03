@@ -234,26 +234,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-/*
-int main(void) {
-    srand(time(NULL));
-    tree_t *tree = mc_create_tree();
-    board_t *game = twixt_create(15);
-    char buffer[100];
-    int x, y;
-    /*mc_advance_tree(&tree, (position_t){12,12});
-    position_t move = mc_search(20, 1, game, &tree, BLACK);
-    printf("-> (%d, %d)\n", move.x, move.y);
-    while (fgets(buffer, sizeof(buffer), stdin)) {
-        if (sscanf(buffer, "%d,%d", &x, &y) == 2) {
-            printf("Searching...\n");
-            mc_advance_tree(&tree, (position_t){x, y});
-            position_t move = mc_search(600, 200, game, &tree, BLACK);
-            printf("-> (%d, %d)\n", move.x, move.y);
-        } else {
-            printf("Invalid input. Please enter in 'number,number' format.\n");
-        }
-    }
-
-    return 0;
-}*/
