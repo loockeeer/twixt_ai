@@ -10,39 +10,10 @@
 
 #include "serializer.h"
 #include "twixt.h"
+#include "rand.h"
 
-// Credit : https://dotat.at/@/2023-06-21-pcg64-dxsm.html
-typedef struct pcg64 {
-    __uint128_t state, inc;
-} pcg64_t;
-
-uint64_t _random_pull(pcg64_t *rng) {
-    /* cheap (half-width) multiplier */
-    const uint64_t mul = 15750249268501108917ULL;
-    /* linear congruential generator */
-    __uint128_t state = rng->state;
-    rng->state = state * mul + rng->inc;
-    /* DXSM (double xor shift multiply) permuted output */
-    uint64_t hi = (uint64_t)(state >> 64);
-    uint64_t lo = (uint64_t)(state | 1);
-    hi ^= hi >> 32;
-    hi *= mul;
-    hi ^= hi >> 48;
-    hi *= lo;
-    return(hi);
-}
-
-pcg64_t _random_seed(pcg64_t rng) {
-    /* must ensure rng.inc is odd */
-    rng.inc = (rng.inc << 1) | 1;
-    rng.state += rng.inc;
-    _random_pull(&rng);
-    return(rng);
-}
-// End credit
-
-pcg64_t _random_init() {
-    return _random_seed((pcg64_t){ 1 });
+pcg64_t zobrist_random_init() {
+    return random_seed((pcg64_t){ 1 });
 }
 
 size_t no_pos_for_zoom(uint8_t zoom) {
@@ -52,9 +23,9 @@ size_t no_pos_for_zoom(uint8_t zoom) {
 uint64_t *make_bitstrings(const uint8_t zoom) {
     size_t s = no_pos_for_zoom(zoom) * (1 + 2 * 256); // 1 for empty, 2 * 256 for every link configuration possible for every player
     uint64_t *bitstrings = malloc(s);
-    pcg64_t rng = _random_init();
+    pcg64_t rng = zobrist_random_init();
     if (bitstrings == NULL) return NULL;
-    for (int i = 0; i < s; i++) bitstrings[i] = _random_pull(&rng);
+    for (int i = 0; i < s; i++) bitstrings[i] = random_pull(&rng);
     return bitstrings;
 }
 

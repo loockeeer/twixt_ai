@@ -16,7 +16,9 @@ add_executable(twixt_ai main.c montecarlo.c twixt.c
         serializer.c
         zobrist.h
         zobrist.c
-        zobrist.c)
+        zobrist.c
+        rand.h
+        rand.c)
 # Ajouter les répertoires d'inclusion et les bibliothèques
 target_include_directories(twixt_ai PRIVATE ${GTK_INCLUDE_DIRS} ${CAIRO_INCLUDE_DIRS})
 target_link_libraries(twixt_ai PRIVATE ${GTK_LIBRARIES} ${CAIRO_LIBRARIES})
