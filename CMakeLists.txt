@@ -13,7 +13,10 @@ pkg_check_modules(CAIRO REQUIRED cairo)
 
 add_executable(twixt_ai main.c montecarlo.c twixt.c
         serializer.h
-        serializer.c)
+        serializer.c
+        zobrist.h
+        zobrist.c
+        zobrist.c)
 # Ajouter les répertoires d'inclusion et les bibliothèques
 target_include_directories(twixt_ai PRIVATE ${GTK_INCLUDE_DIRS} ${CAIRO_INCLUDE_DIRS})
 target_link_libraries(twixt_ai PRIVATE ${GTK_LIBRARIES} ${CAIRO_LIBRARIES})
