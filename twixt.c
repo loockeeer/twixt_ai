@@ -17,10 +17,11 @@ board_t *twixt_create(int size) {
   return board;
 }
 
-void twixt_destroy(board_t *board) {
-  if (board == NULL) return;
-  free(board->data);
-  free(board);
+void twixt_free(board_t **board) {
+  if (board == NULL || *board == NULL) return;
+  free((*board)->data);
+  free(*board);
+  *board = NULL;
 }
 
 int twixt_size(const board_t *board) {
@@ -262,4 +263,3 @@ void twixt_swap(board_t *board) {
   assert(board != NULL);
   // TODO
 }
-

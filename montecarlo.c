@@ -39,17 +39,18 @@ tree_t *mc_create_tree() {
   return t;
 }
 
-void mc_destroy_tree(tree_t *tree) {
-  assert(tree != NULL);
-  if (tree->children != NULL) {
-    for (int i = 0; i < tree->children_length; i++) {
-      if (!tree->children[i].protected) {
-        mc_destroy_tree(tree->children[i].this);
+void mc_free_tree(tree_t **tree) {
+  if (tree == NULL || *tree == NULL) return;
+  if ((*tree)->children != NULL) {
+    for (int i = 0; i < (*tree)->children_length; i++) {
+      if (!(*tree)->children[i].protected) {
+        mc_free_tree(&(*tree)->children[i].this);
       }
     }
-    free(tree->children);
+    free((*tree)->children);
   }
-  free(tree);
+  free(*tree);
+  *tree = NULL;
 }
 
 double mc_calculate_action(tree_t *tree) {
@@ -187,7 +188,7 @@ void *descend_wrapper(void *data) {
   descend_args_t args = *(descend_args_t *) data;
   board_t *board = twixt_copy(args.board);
   descend(board, args.tree, args.opt, args.player);
-  twixt_destroy(board);
+  twixt_free(&board);
   return NULL;
 }
 
@@ -205,7 +206,7 @@ void step(int nt, const board_t *board, tree_t *tree, player_t player) {
   free(pool);
   board_t *b2 = twixt_copy(board);
   expand(b2, tree, player);
-  twixt_destroy(b2);
+  twixt_free(&b2);
 }
 
 tree_t *get_max(tree_t *tree) {
@@ -231,7 +232,7 @@ position_t mc_search(int ns, int nt, const board_t *board, tree_t **tree, player
     printf("[LOG] Stepped %d/%d\n", s + 1, ns);
   }
   tree_t *best = get_max(*tree);
-  mc_destroy_tree(*tree);
+  mc_free_tree(tree);
   *tree = best;
   return (*tree)->label.move;
 }
@@ -250,6 +251,6 @@ void mc_advance_tree(tree_t **tree, position_t move) {
     keep = mc_create_tree();
     keep->label.move = move;
   }
-  mc_destroy_tree(*tree);
+  mc_free_tree(tree);
   *tree = keep;
 }

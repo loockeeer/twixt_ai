@@ -226,7 +226,7 @@ int main(int argc, char *argv[]) {
     gtk_widget_destroy(drawing_area);
     gtk_widget_destroy(window);
 
-    twixt_destroy(board);
+    twixt_free(&board);
     mc_destroy_tree(tree);
 
     return 0;

@@ -40,7 +40,7 @@ int twixt_size(const board_t *board);
 
 node_t *twixt_peek(position_t pos, const board_t *board);
 
-void twixt_destroy(board_t *twixt);
+void twixt_free(board_t **twixt);
 
 bool twixt_play(board_t *twixt, player_t player, position_t position);
 

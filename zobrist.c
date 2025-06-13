@@ -26,32 +26,29 @@ uint64_t *make_bitstrings(const uint8_t zoom) {
 }
 
 size_t get_position_index(int8_t dx, int8_t dy) {
-    uint8_t d = abs(dx) + abs(dy);
+    const uint8_t d = abs(dx) + abs(dy);
     if (d == 0) return 0;
-    size_t start = 1 + 2 * d * (d - 1);
+    const size_t start = 1 + 2 * d * (d - 1);
     size_t offset;
     if (d == 0) offset= 0;
-
-    if (dx == d) offset= dy + d;
-    if (dy == d) offset= 3*d - dx;
-    if (dx == -d) offset= 5*d + dy;
-
-    offset= 7*d + dx;
+    else if (dx == d) offset= dy + d;
+    else if (dy == d) offset= 3*d - dx;
+    else if (dx == -d) offset= 5*d + dy;
+    else offset= 7*d + dx;
     return start + offset;
 }
 
 size_t get_bitstring_index(int8_t deltax, int8_t deltay, player_t player, uint8_t links) {
     assert(player == 1 || player == 2);
 
-    size_t pos_index = get_position_index(deltax, deltay);
-    size_t player_bit = player - 1;
+    const size_t pos_index = get_position_index(deltax, deltay);
+    const size_t player_bit = player - 1;
 
-    size_t index = (((pos_index * 2) + player_bit) * 256) + links;
+    const size_t index = (pos_index * 2 + player_bit) * 256 + links;
 
     return index;
 }
-
-uint64_t hash(position_t pos, board_t *board, uint8_t zoom, const uint64_t *bitstrings)
+uint64_t hash(position_t pos, const board_t *board, uint8_t zoom, const uint64_t *bitstrings)
 {
     uint64_t ret = 0;
     for (int8_t i = -((int8_t) zoom); i <= ((int8_t) zoom); i++) {
@@ -67,6 +64,26 @@ uint64_t hash(position_t pos, board_t *board, uint8_t zoom, const uint64_t *bits
 uint64_t update_hash(uint64_t hash, position_t pos, player_t player, uint8_t links, const uint64_t *bitstrings) {
     return hash ^ (bitstrings[get_bitstring_index(0, 0, NONE, 0)]) ^ bitstrings[get_bitstring_index(0, 0, player, links)];
 }
+
+typedef struct hashset_s {
+    int size;
+    uint64_t *hashes;
+} hashset_t;
+
+hashset_t *hashset_create(int size) {
+    hashset_t *set = malloc(sizeof(hashset_t));
+    if (set == NULL) return NULL;
+    set->size = size;
+    set->hashes = malloc(size * sizeof(uint64_t));
+    return set;
+};
+void hashset_free(hashset_t **set) {
+    if (set == NULL || *set == NULL) return;
+    free((*set)->hashes);
+    free(*set);
+    *set = NULL;
+}
+void hashset_update(hashset_t *set, board_t *board, position_t *position, player_t *player);
 
 typedef struct observation_s {
     uint bv; // visited (black)
@@ -99,21 +116,20 @@ zobrist_t *zobrist_create(int nt, int zoom_count) {
     return zobrist;
 }
 
-void zobrist_destroy(zobrist_t *zobrist) {
-    if (zobrist == NULL) return;
-    for (int i =  0;i<zobrist->zc; i++) {
-        free(zobrist->observations[i]);
-        free(zobrist->zoom_bitstrings[i]);
+void zobrist_free(zobrist_t **zobrist) {
+    if (zobrist == NULL || *zobrist == NULL) return;
+    for (int i =  0;i<(*zobrist)->zc; i++) {
+        free((*zobrist)->observations[i]);
+        free((*zobrist)->zoom_bitstrings[i]);
     }
-    free(zobrist);
+    free(*zobrist);
+    *zobrist = NULL;
 }
 
-float zobrist_evaluate(zobrist_t *zobrist, position_t position, player_t player, board_t *board) {
+float zobrist_evaluate(const zobrist_t *zobrist, position_t position, player_t player, const board_t *board) {
     assert(player != NONE);
     assert(board != NULL);
     assert(zobrist != NULL);
-    uint total_visited = 0;
-    uint total_chosen = 0;
     for (int zoom = zobrist->zc; zoom > 0; zoom--) {
         uint64_t current_hash = hash(position, board, zoom, zobrist->zoom_bitstrings[zoom]);
         observation_t *observation = zobrist->observations[current_hash % zobrist->nt];
@@ -128,9 +144,9 @@ float zobrist_evaluate(zobrist_t *zobrist, position_t position, player_t player,
     assert(false); // should not happen, very weird bug
 }
 
-void zobrist_update(zobrist_t *zobrist, game_t *game) {
+void zobrist_populate(const zobrist_t *zobrist, const game_t *game) {
     assert(zobrist != NULL);
-    moves_t *move = game->moves;
+    const moves_t *move = game->moves;
     board_t *board = twixt_create(game->size);
     while (move != NULL) {
         if (move->type == SWAP) {
@@ -157,9 +173,9 @@ void zobrist_update(zobrist_t *zobrist, game_t *game) {
         twixt_play(board, move->next->player, move->next->peg);
         move = move->next->next;
     }
-    twixt_destroy(board);
+    twixt_free(&board);
 }
-char *zobrist_serialize(zobrist_t *zobrist) { // TODO : à tester
+char *zobrist_serialize(const zobrist_t *zobrist) { // TODO : à tester
     assert(zobrist != NULL);
     size_t total_size = sizeof(uint64_t) + sizeof(uint8_t);
 

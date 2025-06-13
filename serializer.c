@@ -73,9 +73,11 @@ char *metadata_serialize(void *data, metadata_provider_t metadata_provider) {
     }
     return NULL;
 }
-void metadata_free(void *data, metadata_provider_t metadata_provider) {
+void metadata_free(void **data, metadata_provider_t metadata_provider) {
     if (metadata_provider == TWIXTLIVE) {
-        free(data);
+        if (data == NULL || *data == NULL) return;
+        free(*data);
+        *data = NULL;
     }
 }
 
@@ -99,12 +101,15 @@ moves_t *moves_append(moves_t *before, moves_t *new) {
     return new;
 }
 
-void moves_free(moves_t *moves) {
-    while (moves != NULL) {
-        moves_t *next = moves->next;
-        free(moves);
-        moves = next;
+void moves_free(moves_t **moves) {
+    if (moves == NULL || *moves == NULL) return;
+    moves_t *cur = *moves;
+    while (cur != NULL) {
+        moves_t *next = cur->next;
+        free(*moves);
+        cur = next;
     }
+    *moves = NULL;
 }
 
 game_t *game_deserialize(char *buf) {
@@ -209,8 +214,10 @@ game_t *game_deserialize(char *buf) {
 char *game_serialize(game_t *game) {
     return "WIP";
 }
-void game_free(game_t *game) {
-    moves_free(game->moves);
-    if (game->board != NULL) twixt_destroy(game->board);
-    free(game);
+void game_free(game_t **game) {
+    if (game == NULL || *game == NULL) return;
+    moves_free(&(*game)->moves);
+    if ((*game)->board != NULL) twixt_free(&(*game)->board);
+    free(*game);
+    *game = NULL;
 }
