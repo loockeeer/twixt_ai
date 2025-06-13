@@ -258,3 +258,8 @@ bool twixt_play(board_t *board, player_t player, position_t p) {
   return true;
 }
 
+void twixt_swap(board_t *board) {
+  assert(board != NULL);
+  // TODO
+}
+
