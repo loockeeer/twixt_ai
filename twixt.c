@@ -73,16 +73,19 @@ bool is_move_in_player_bounds(int size, player_t player, position_t p) {
   return p.y != 0 && p.y != size - 1;
 }
 
-bool *twixt_available_moves(const board_t *board, player_t player) {
+bool *twixt_available_moves(const board_t *board, player_t player, int *count) {
   assert(board != NULL);
   bool *data = calloc(board->size * board->size, sizeof(bool));
   if (data == NULL) return NULL;
+  *count = 0;
   for (int i = 0; i < board->size; i++) {
     for (int j = 0; j < board->size; j++) {
       position_t pos = (position_t){i, j};
       if (board->data[get_index(board->size, pos)].player == NONE // ensure cell is empty
-          && is_move_in_player_bounds(board->size, player, pos))
+          && is_move_in_player_bounds(board->size, player, pos)) {
         data[get_index(board->size, pos)] = true;
+        (*count)++;
+      }
     }
   }
   return data;

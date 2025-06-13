@@ -15,56 +15,16 @@ typedef struct label_s {
   position_t move;
 } label_t;
 
-typedef struct tree_list_s {
+typedef struct children_container_s {
   tree_t *this;
-  struct tree_list_s *next;
-  int length;
   bool protected;
-} tree_list_t;
+} children_container_t;
 
 typedef struct tree_s {
   label_t label;
-  tree_list_t *children;
+  children_container_t *children;
+  int children_length;
 } tree_t;
-
-tree_list_t *mc_tl_create(tree_t *this) {
-  tree_list_t *new = malloc(sizeof(tree_list_t));
-  if (new == NULL) return NULL;
-  new->this = this;
-  new->next = NULL;
-  new->length = 1;
-  new->protected = false;
-  return new;
-}
-
-tree_list_t *mc_tl_append(tree_list_t *tl, tree_t *tree) {
-  assert(tree != NULL);
-  tree_list_t *new = mc_tl_create(tree);
-  if (tl == NULL) return new;
-  new->next = tl;
-  new->length = tl->length + 1;
-  return new;
-}
-
-int mc_tl_length(const tree_list_t *tl) {
-  if (tl == NULL) return 0;
-  return tl->length;
-}
-
-void mc_tl_destroy(tree_list_t *tl) {
-  assert(tl != NULL);
-  tree_list_t *cursor = tl;
-  while (cursor != NULL) {
-    tree_list_t *next = cursor->next;
-    if (!cursor->protected) {
-      mc_destroy_tree(cursor->this);
-      free(cursor);
-    } else {
-      free(cursor);
-    }
-    cursor = next;
-  }
-}
 
 tree_t *mc_create_tree() {
   tree_t *t = malloc(sizeof(tree_t));
@@ -74,13 +34,21 @@ tree_t *mc_create_tree() {
   atomic_store(&(t->label.n_won), 0);
   t->label.prior = 0.5;
   t->label.move = (position_t){0, 0};
+  t->children = NULL;
+  t->children_length = 0;
   return t;
 }
 
 void mc_destroy_tree(tree_t *tree) {
   assert(tree != NULL);
-  if (tree->children == NULL) return;
-  mc_tl_destroy(tree->children);
+  if (tree->children != NULL) {
+    for (int i = 0; i < tree->children_length; i++) {
+      if (!tree->children[i].protected) {
+        mc_destroy_tree(tree->children[i].this);
+      }
+    }
+    free(tree->children);
+  }
   free(tree);
 }
 
@@ -94,7 +62,7 @@ double mc_calculate_action(tree_t *tree) {
   return tree->label.prior;
 }
 
-outcome_t continue_strategy(board_t *board, player_t player) {
+outcome_t heuristic(board_t *board, player_t player) {
   while (true) {
     position_t pos = twixt_random_move(board, player);
     if (!twixt_play(board, player, pos))
@@ -115,30 +83,29 @@ int get_outcome_value(outcome_t o, player_t opt) {
   return -5;
 }
 
-tree_t *get_max_action(tree_list_t *tl) {
-  assert(tl != NULL);
-  tree_list_t *cursor = tl;
-  tree_list_t *best = tl;
-  double best_value = mc_calculate_action(tl->this);
-  while (cursor != NULL) {
-    double av = mc_calculate_action(cursor->this);
-    if (av > best_value) {
+tree_t *get_max_action(const tree_t *t) {
+  assert(t != NULL);
+  tree_t *best = NULL;
+  double best_value = DBL_MIN;
+  for (int i = 0;i < t->children_length; i++) {
+    double av = mc_calculate_action(t->children[i].this);
+    if (av > best_value || best == NULL) {
       best_value = av;
-      best = cursor;
+      best = t->children[i].this;
     }
-    cursor = cursor->next;
   }
-  return best->this;
+  return best;
 }
 
 outcome_t descend(board_t *board, const tree_t *tree, player_t opt, player_t player) {
   assert(tree != NULL);
-  if (mc_tl_length(tree->children) == 0) {
-    return continue_strategy(board, player);
+  if (tree->children_length == 0) {
+    return heuristic(board, player);
   }
 
-  tree_t *best_child = get_max_action(tree->children);
-  atomic_fetch_add(&(best_child->label.n_won), -5);  atomic_fetch_add(&(best_child->label.n_visited), 1);
+  tree_t *best_child = get_max_action(tree);
+  atomic_fetch_add(&(best_child->label.n_won), -5);
+  atomic_fetch_add(&(best_child->label.n_visited), 1);
 
   twixt_play(board, player, best_child->label.move);
   outcome_t outcome = descend(board, best_child, opt, player == RED ? BLACK : RED);
@@ -147,88 +114,66 @@ outcome_t descend(board_t *board, const tree_t *tree, player_t opt, player_t pla
   return outcome;
 }
 
-tree_list_t *expand_leaf(const board_t *board, player_t player) {
+children_container_t *expand_leaf(const board_t *board, player_t player, int *count) {
   assert(board != NULL);
-  bool *moves = twixt_available_moves(board, player);
-  tree_list_t *tl = NULL;
+  bool *moves = twixt_available_moves(board, player, count);
+  children_container_t *children = calloc(*count,sizeof(children_container_t));
+  if (children == NULL) return NULL;
+  int n = 0;
   int s = twixt_size(board);
   for (int i = 0; i < s; i++) {
     for (int j = 0; j < s; j++) {
       if (!moves[j * s + i]) continue;
       tree_t *tree = mc_create_tree();
       tree->label.move = (position_t){i, j};
-      tl = mc_tl_append(tl, tree);
+      children[n].this = tree;
+      children[n].protected = false;
+      n++;
     }
   }
-  return tl;
+  free(moves);
+  return children;
 }
 
-tree_t *get_max_visits(tree_list_t *tl) {
-  assert(tl != NULL);
-  tree_list_t *cursor = tl;
-  tree_list_t *best = tl;
+tree_t *get_max_visits(tree_t *tree) {
+  assert(tree != NULL);
+  tree_t *best = NULL;
   int best_value = INT_MIN;
-  while (cursor != NULL) {
-    int v = atomic_load(&(cursor->this->label.n_visited));
-    if (v > best_value) {
+  for (int i = 0; i < tree->children_length; i++) {
+    tree_t *child = tree->children[i].this;
+    int v = atomic_load(&(child->label.n_visited));
+    if (v > best_value || best == NULL) {
       best_value = v;
-      best = cursor;
+      best = child;
     }
-    cursor = cursor->next;
   }
-  return best->this;
+  return best;
 }
 
 int random_int(int max) {
   return (int) (random() % (long) max);
 }
 
-tree_list_t *knuth_shuffle(tree_list_t *tl)
+void shuffle_children(tree_t *tree)
 {
-  if (tl == NULL) return tl;
-  int length = tl->length;
-  tree_t **arrayed_list = malloc(sizeof(tree_t*) * length);
-  bool *arrayed_list_protected = malloc(sizeof(bool) * length);
-  int i = 0;
-  for (tree_list_t *cursor = tl; cursor != NULL; cursor = cursor->next) {
-    arrayed_list[i] = cursor->this;
-    arrayed_list_protected[i] = cursor->protected;
-    cursor->protected = true;
-    i++;
-  }
-  for (i = 0; i < length; i++) {
-    tree_t *tmp = arrayed_list[i];
+  for (int i = 0; i < tree->children_length; i++) {
+    children_container_t tmp = tree->children[i];
     int j = random_int(i+1);
-    arrayed_list[i] = arrayed_list[j];
-    arrayed_list[j] = tmp;
-    bool tmp2 = arrayed_list_protected[i];
-    arrayed_list_protected[i] = arrayed_list[j];
-    arrayed_list_protected[j] = tmp2;
+    tree->children[i] = tree->children[j];
+    tree->children[j] = tmp;
   }
-
-  mc_tl_destroy(tl);
-  tl = NULL;
-  for (i = 0; i < length; i++) {
-    tl = mc_tl_append(tl, arrayed_list[i]);
-    tl->protected = arrayed_list_protected[i];
-  }
-
-  free(arrayed_list_protected);
-  free(arrayed_list);
-  return tl;
 }
 
 void expand(board_t *board, tree_t *tree, player_t player) {
   assert(tree != NULL);
   tree_t *cursor = tree;
-  while (mc_tl_length(cursor->children) > 0) {
-    cursor->children = knuth_shuffle(cursor->children);
-    cursor = get_max_visits(cursor->children);
+  while (cursor->children_length > 0) {
+    cursor = get_max_visits(cursor);
     twixt_play(board, player, cursor->label.move);
     player = player == RED ? BLACK : RED;
   }
-  cursor->children = expand_leaf(board, player);
-  cursor->children = knuth_shuffle(cursor->children);
+  cursor->children = expand_leaf(board, player, &(cursor->children_length));
+  shuffle_children(cursor);
 }
 
 typedef struct {
@@ -263,18 +208,17 @@ void step(int nt, const board_t *board, tree_t *tree, player_t player) {
   twixt_destroy(b2);
 }
 
-tree_t *get_max(tree_list_t *tl) {
-  assert(tl != NULL);
-  tree_list_t *cursor = tl;
-  tree_list_t *best = tl;
+tree_t *get_max(tree_t *tree) {
+  assert(tree != NULL);
+  children_container_t *best = NULL;
   int best_value = INT_MIN;
-  while (cursor != NULL) {
-    int v = atomic_load(&(cursor->this->label.n_visited));
-    if (v > best_value) {
+
+  for (int i = 0;i < tree->children_length; i++) {
+    int v = atomic_load(&(tree->children[i].this->label.n_visited));
+    if (v > best_value || best == NULL) {
       best_value = v;
-      best = cursor;
+      best = &(tree->children[i]);
     }
-    cursor = cursor->next;
   }
   best->protected = true;
   return best->this;
@@ -286,25 +230,23 @@ position_t mc_search(int ns, int nt, const board_t *board, tree_t **tree, player
     step(nt, board, *tree, player);
     printf("[LOG] Stepped %d/%d\n", s + 1, ns);
   }
-  tree_t *best = get_max((*tree)->children);
+  tree_t *best = get_max(*tree);
   mc_destroy_tree(*tree);
   *tree = best;
   return (*tree)->label.move;
 }
 
 void mc_advance_tree(tree_t **tree, position_t move) {
-  tree_list_t *cursor = (*tree)->children;
-  tree_t *keep = NULL;
-  while (cursor != NULL) {
-    position_t l_move = cursor->this->label.move;
+  tree_t *keep = *tree;
+  for (int i = 0; i < keep->children_length; i++) {
+    position_t l_move = keep->children[i].this->label.move;
     if (l_move.x == move.x && l_move.y == move.y) {
-      cursor->protected = true;
-      keep = cursor->this;
+      keep->children[i].protected = true;
+      keep = keep->children[i].this;
       break;
     }
-    cursor = cursor->next;
   }
-  if (keep == NULL) {
+  if (keep == *tree) {
     keep = mc_create_tree();
     keep->label.move = move;
   }

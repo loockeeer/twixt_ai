@@ -46,5 +46,5 @@ outcome_t twixt_check_winner(const board_t *twixt);
 
 position_t twixt_random_move(const board_t *twixt, player_t player);
 
-bool *twixt_available_moves(const board_t *twixt, player_t player);
+bool *twixt_available_moves(const board_t *twixt, player_t player, int *count);
 #endif //TWIXT_H
