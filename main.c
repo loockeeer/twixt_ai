@@ -14,7 +14,7 @@
 #define PEG_RADIUS 9
 #define HOLE_RADIUS 5
 #define BORDER_OFFSET 1
-#define BOARD_SIZE 12  // Example board size, adjust as needed
+#define BOARD_SIZE 12
 
 tree_t *tree;
 board_t *board;

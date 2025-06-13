@@ -1,11 +1,5 @@
-//
-// Created by lucas on 13/06/2025.
-//
-
 #ifndef ZOBRIST_H
 #define ZOBRIST_H
-#include <stdint.h>
-
 #include "serializer.h"
 #include "twixt.h"
 

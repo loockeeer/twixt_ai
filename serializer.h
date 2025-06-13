@@ -1,7 +1,3 @@
-//
-// Created by lucas on 02/06/2025.
-//
-
 #ifndef SERIALIZER_H
 #define SERIALIZER_H
 #include "twixt.h"

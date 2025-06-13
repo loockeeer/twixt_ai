@@ -1,7 +1,5 @@
 #ifndef TWIXT_H
 #define TWIXT_H
-#include<stdbool.h>
-#include <stdint.h>
 
 typedef enum {
   ONGOING,

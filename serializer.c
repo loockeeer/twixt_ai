@@ -1,6 +1,3 @@
-//
-// Created by lucas on 02/06/2025.
-//
 #include"serializer.h"
 
 #include <stdio.h>
