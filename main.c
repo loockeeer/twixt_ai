@@ -14,7 +14,7 @@
 #define PEG_RADIUS 9
 #define HOLE_RADIUS 5
 #define BORDER_OFFSET 1
-#define BOARD_SIZE 10  // Example board size, adjust as needed
+#define BOARD_SIZE 12  // Example board size, adjust as needed
 
 tree_t *tree;
 board_t *board;
@@ -27,14 +27,6 @@ static void draw_circle(cairo_t *cr, double x, double y, double r, double red, d
     cairo_set_source_rgb(cr, red, green, blue);
     cairo_arc(cr, x, y, r, 0, 2 * M_PI);
     cairo_fill(cr);
-}
-
-static void draw_line(cairo_t *cr, double x1, double y1, double x2, double y2, double red, double green, double blue) {
-    cairo_set_source_rgb(cr, red, green, blue);
-    cairo_set_line_width(cr, 4);
-    cairo_move_to(cr, x1, y1);
-    cairo_line_to(cr, x2, y2);
-    cairo_stroke(cr);
 }
 
 position_t deltass[8] = {{1, -2}, {2, -1}, {2, 1}, {1, 2}, {-1, 2}, {-2, 1}, {-2, -1}, {-1, -2}};
@@ -158,7 +150,7 @@ static gboolean on_mouse_click(GtkWidget *widget, GdkEventButton *event, gpointe
                         exit(1);
                     }
                     mc_advance_tree(&tree, (position_t){i, j});
-                    position_t move = mc_search(500, 500, board, &tree, BLACK);
+                    position_t move = mc_search(20, 20, board, &tree, BLACK);
                     twixt_play(board, BLACK, move);
                     o = twixt_check_winner(board);
                     if (o != ONGOING) {
@@ -174,7 +166,7 @@ static gboolean on_mouse_click(GtkWidget *widget, GdkEventButton *event, gpointe
         }
     }
     if (!t) {
-        position_t move = mc_search(500, 500, board, &tree, BLACK);
+        position_t move = mc_search(20, 20, board, &tree, BLACK);
         twixt_play(board, BLACK, move);
         outcome_t o = twixt_check_winner(board);
         if (o != ONGOING) {
@@ -231,6 +223,11 @@ int main(int argc, char *argv[]) {
 
     gtk_widget_show_all(window);
     gtk_main();
+    gtk_widget_destroy(drawing_area);
+    gtk_widget_destroy(window);
+
+    twixt_destroy(board);
+    mc_destroy_tree(tree);
 
     return 0;
 }
