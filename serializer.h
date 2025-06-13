@@ -34,10 +34,7 @@ typedef enum move_type {
 typedef struct moves_s {
     move_type_t type;
     player_t player;
-    struct {
-        int red_pos;
-        int black_pos;
-    } peg;
+    position_t peg;
     struct moves_s *next;
 } moves_t;
 

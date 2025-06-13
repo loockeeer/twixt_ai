@@ -87,11 +87,11 @@ moves_t *moves_create(move_type_t type, player_t player, int red_pos, int black_
     if (moves == NULL) return NULL;
     moves->player = player;
     if (moves->type == PEG) {
-        moves->peg.red_pos = red_pos;
-        moves->peg.black_pos = black_pos;
+        moves->peg.y = red_pos;
+        moves->peg.x = black_pos;
     } else {
-        moves->peg.red_pos = -1;
-        moves->peg.black_pos = -1;
+        moves->peg.y = -1;
+        moves->peg.x = -1;
     }
     return moves;
 }
