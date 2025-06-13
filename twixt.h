@@ -1,6 +1,8 @@
 #ifndef TWIXT_H
 #define TWIXT_H
 #include<stdbool.h>
+#include <stdint.h>
+
 typedef enum {
   ONGOING,
   RED_WINS,
@@ -37,6 +39,8 @@ board_t *twixt_create(int size);
 board_t *twixt_copy(const board_t *board);
 
 int twixt_size(const board_t *board);
+
+node_t *twixt_peek(position_t pos, const board_t *board);
 
 void twixt_destroy(board_t *twixt);
 

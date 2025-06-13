@@ -55,6 +55,11 @@ bool is_valid_coordinate(int size, position_t p) {
   return p.x >= 0 && p.y >= 0 && p.x < size && p.y < size;
 }
 
+node_t *twixt_peek(position_t p, const board_t *board) {
+  assert(is_valid_coordinate(board->size, p));
+  return &board->data[get_index(board->size, p)];
+}
+
 position_t deltas[8] = {{1, -2}, {2, -1}, {2, 1}, {1, 2}, {-1, 2}, {-2, 1}, {-2, -1}, {-1, -2}};
 
 bool has_link(const board_t *board, position_t p, int index) {
