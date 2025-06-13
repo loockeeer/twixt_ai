@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
     gtk_widget_destroy(window);
 
     twixt_free(&board);
-    mc_destroy_tree(tree);
+    mc_free_tree(tree);
 
     return 0;
 }
