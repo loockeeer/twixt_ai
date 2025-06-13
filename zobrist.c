@@ -54,36 +54,12 @@ uint64_t hash(position_t pos, const board_t *board, uint8_t zoom, const uint64_t
     for (int8_t i = -((int8_t) zoom); i <= ((int8_t) zoom); i++) {
         for (int8_t j = -((int8_t) zoom); j <= ((int8_t) zoom); j++) {
             if (abs(i) + abs(j) > zoom) continue;
-            node_t *peek = twixt_peek(pos, board);
+            node_t *peek = twixt_peek({pos.x + i, pos.y + j}, board);
             ret ^= bitstrings[get_bitstring_index(i, j, peek->player, peek->links)];
         }
     }
     return ret;
 }
-
-uint64_t update_hash(uint64_t hash, position_t pos, player_t player, uint8_t links, const uint64_t *bitstrings) {
-    return hash ^ (bitstrings[get_bitstring_index(0, 0, NONE, 0)]) ^ bitstrings[get_bitstring_index(0, 0, player, links)];
-}
-
-typedef struct hashset_s {
-    int size;
-    uint64_t *hashes;
-} hashset_t;
-
-hashset_t *hashset_create(int size) {
-    hashset_t *set = malloc(sizeof(hashset_t));
-    if (set == NULL) return NULL;
-    set->size = size;
-    set->hashes = malloc(size * sizeof(uint64_t));
-    return set;
-};
-void hashset_free(hashset_t **set) {
-    if (set == NULL || *set == NULL) return;
-    free((*set)->hashes);
-    free(*set);
-    *set = NULL;
-}
-void hashset_update(hashset_t *set, board_t *board, position_t *position, player_t *player);
 
 typedef struct observation_s {
     uint bv; // visited (black)
