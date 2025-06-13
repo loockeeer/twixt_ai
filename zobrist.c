@@ -6,6 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "serializer.h"
 #include "twixt.h"
@@ -165,15 +166,116 @@ void zobrist_update(zobrist_t *zobrist, game_t *game) {
     moves_t *move = game->moves;
     board_t *board = twixt_create(game->size);
     while (move != NULL) {
-        if (move->type != PEG) continue;
-        if (move->next == NULL || move->next->type != PEG) continue;
+        if (move->type == SWAP) {
+            twixt_swap(board);
+        }
+        if (move->type != PEG) {
+            move = move->next;
+            continue;
+        };
+        twixt_play(board, move->player, move->peg);
+        if (move->next == NULL || move->next->type != PEG) {
+            move = move->next->next;
+            continue;
+        }
         for (int zoom = zobrist->zc; zoom > 0; zoom--) {
-            uint64_t current_hash = hash(move->peg,game->board, zoom, zobrist->zoom_bitstrings[zoom]);
+            uint64_t current_hash = hash(move->peg,board, zoom, zobrist->zoom_bitstrings[zoom]);
             observation_t obs = zobrist->observations[zoom][current_hash % zobrist->nt];
             if (move->player == BLACK) obs.rv++;
             if (move->player == RED) obs.bv++;
+            if (move->next->player == BLACK) obs.bc++;
+            if (move->next->player == RED) obs.rc++;
+
+        }
+        twixt_play(board, move->next->player, move->next->peg);
+        move = move->next->next;
+    }
+    twixt_destroy(board);
+}
+char *zobrist_serialize(zobrist_t *zobrist) { // TODO : à tester
+    assert(zobrist != NULL);
+    size_t total_size = sizeof(uint64_t) + sizeof(uint8_t);
+
+    for (uint8_t i = 0; i < zobrist->zc; i++) {
+        total_size += zobrist->nt * sizeof(observation_t);
+    }
+
+    char *buffer = malloc(total_size+1);
+    if (!buffer) return NULL;
+
+    char *p = buffer;
+
+    memcpy(p, &zobrist->nt, sizeof(zobrist->nt));
+    p += sizeof(zobrist->nt);
+
+    memcpy(p, &zobrist->zc, sizeof(zobrist->zc));
+    p += sizeof(zobrist->zc);
+
+    for (uint8_t i = 0; i < zobrist->zc; i++) {
+        memcpy(p, zobrist->observations[i], zobrist->nt * sizeof(observation_t));
+        p += zobrist->nt * sizeof(observation_t);
+    }
+
+    *p = '\0';
+    return buffer;
+}
+zobrist_t *zobrist_deserialize(char *buf) {
+    if (!buf) return NULL;
+
+    char *p = buf;
+
+    uint64_t nt;
+    char *o = strncpy((char*)&nt, p, sizeof(nt));
+    p += sizeof(nt);
+    if (o != p) return NULL;
+
+    uint8_t zc;
+    o = strncpy((char*)&zc, p, sizeof(zc));
+    p += sizeof(zc);
+    if (o != p) return NULL;
+
+    zobrist_t *z = malloc(sizeof(zobrist_t));
+    if (!z) return NULL;
+    z->nt = nt;
+    z->zc = zc;
+
+    z->observations = malloc(zc * sizeof(observation_t*));
+    z->zoom_bitstrings = malloc(zc * sizeof(uint64_t*));
+    if (!z->observations || !z->zoom_bitstrings) {
+        free(z->observations);
+        free(z->zoom_bitstrings);
+        free(z);
+        return NULL;
+    }
+
+    for (uint8_t i = 0; i < zc; i++) { // TODO : s'assurer que c'est **safe**
+        z->observations[i] = malloc(nt * sizeof(observation_t));
+        if (!z->observations[i]) {
+            for (uint8_t j = 0; j < i; j++) free(z->observations[j]);
+            free(z->observations);
+            free(z->zoom_bitstrings);
+            free(z);
+            return NULL;
+        }
+        o = strncpy((char*)z->observations[i], p, nt * sizeof(observation_t));
+        p += nt * sizeof(observation_t);
+        if (o != p) {
+            for (uint8_t j = 0; j <= i; j++) free(z->observations[j]);
+            free(z->observations);
+            for (uint8_t j = 0; j < i; j++) free(z->zoom_bitstrings[j]);
+            free(z->zoom_bitstrings);
+            free(z);
+            return NULL;
+        }
+        z->zoom_bitstrings[i] = make_bitstrings(i);
+        if (!z->zoom_bitstrings[i]) {
+            for (uint8_t j = 0; j <= i; j++) free(z->observations[j]);
+            free(z->observations);
+            for (uint8_t j = 0; j < i; j++) free(z->zoom_bitstrings[j]);
+            free(z->zoom_bitstrings);
+            free(z);
+            return NULL;
         }
     }
+    return z;
 }
-char *zobrist_serialize(zobrist_t *zobrist);
-zobrist_t *zobrist_deserialize(char *buf, char **end);
