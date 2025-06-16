@@ -1,2 +1,7 @@
 cmake-build-debug
 .idea
+*.o
+twixt_ai
+*.yy.c
+*.tab.c
+*.tab.h
