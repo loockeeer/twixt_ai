@@ -97,7 +97,7 @@ bool *twixt_available_moves(const board_t *board, player_t player, int *count) {
   return data;
 }
 // S = placed_moves U cant_access_moves
-position_t twixt_random_move(const board_t *board, player_t player) {
+position_t twixt_random_move(const board_t *board, [[maybe_unused]] player_t player) {
   /*int q = rand() % (board->size * board->size - board->placed_moves); // NOLINT(cert-msc30-c, cert-msc50-cpp)
   int c = 0;
   for (int i = 0; i <= q; i++) c += (is_move_in_player_bounds(board->size, player, get_coords(board->size, i)) && board->data[i].player != NONE);
