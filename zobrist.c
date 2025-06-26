@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "serializer.h"
+#include "game.h"
 #include "twixt.h"
 #include "rand.h"
 

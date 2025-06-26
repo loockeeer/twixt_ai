@@ -1,6 +1,6 @@
 #ifndef ZOBRIST_H
 #define ZOBRIST_H
-#include "serializer.h"
+#include "game.h"
 #include "twixt.h"
 
 typedef struct zobrist_s zobrist_t;
