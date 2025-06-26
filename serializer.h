@@ -2,11 +2,12 @@
 #define SERIALIZER_H
 #include "twixt.h"
 
-typedef enum metadata_provider {
-    TWIXTLIVE
+typedef enum {
+    PROVIDER_NONE,
+    PROVIDER_TWIXTLIVE
 } metadata_provider_t;
 
-typedef struct metadata_twixtlive_s {
+typedef struct {
     long int gid;
     long int timestamp;
     long int whiteid;
@@ -52,6 +53,6 @@ typedef struct game_s {
 game_t *game_deserialize(char *buf);
 char *game_serialize(game_t *game);
 void game_free(game_t **game);
-
+board_t *game_make_board(game_t *game);
 
 #endif //SERIALIZER_H
