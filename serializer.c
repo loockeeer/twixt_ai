@@ -83,7 +83,7 @@ board_t *game_make_board(game_t *game) {
 }
 
 char *game_serialize([[maybe_unused]] game_t *game) {
-    return "WIP";
+    return NULL;
 }
 
 void game_free(game_t **game) {
