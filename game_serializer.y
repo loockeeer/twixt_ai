@@ -123,7 +123,7 @@ input:
     ;
 
 opt_moves: { $$ = NULL;}
-	| moves
+	| moves { $$ = $1; }
 
 metadata_twixtlive:
     'i' NUMBER ',' 't' NUMBER ',' 'w' NUMBER ',' 'b' NUMBER {
@@ -145,8 +145,8 @@ metadata_twixtlive:
     ;
 
 moves:
-     move
-    | move ';' moves {
+     move { $$ = $1; }
+    | moves ';' move {
         $$ = moves_append($1, $3);
     }
     ;

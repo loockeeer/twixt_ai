@@ -1,6 +1,6 @@
 #include <assert.h>
-#include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,84 +9,67 @@
 #include "rand.h"
 
 pcg64_t zobrist_random_init() {
-    return random_seed((pcg64_t){ 1 });
+    return random_seed((pcg64_t){ 10592837502938, 5938201948 });
 }
 
-size_t no_pos_for_zoom(uint8_t zoom) {
-    return 1 + 2 * zoom * (zoom - 1);
-}
-
-uint64_t *make_bitstrings(const uint8_t zoom) {
-    size_t s = no_pos_for_zoom(zoom) * (1 + 2 * 256); // 1 for empty, 2 * 256 for every link configuration possible for every player
-    uint64_t *bitstrings = malloc(s);
-    pcg64_t rng = zobrist_random_init();
+uint64_t *make_bitstrings(const unsigned char zoom) {
+    int s = (1+2*zoom)*(1+2*zoom) * 3 * 256; // 1 for empty, 2 * 256 for every link configuration possible for every player
+    uint64_t *bitstrings = malloc(s * sizeof(uint64_t));
     if (bitstrings == NULL) return NULL;
+    pcg64_t rng = zobrist_random_init();
     for (int i = 0; i < s; i++) bitstrings[i] = random_pull(&rng);
     return bitstrings;
 }
 
-size_t get_position_index(int8_t dx, int8_t dy) {
-    const uint8_t d = abs(dx) + abs(dy);
-    if (d == 0) return 0;
-    const size_t start = 1 + 2 * d * (d - 1);
-    size_t offset;
-    if (d == 0) offset= 0;
-    else if (dx == d) offset= dy + d;
-    else if (dy == d) offset= 3*d - dx;
-    else if (dx == -d) offset= 5*d + dy;
-    else offset= 7*d + dx;
-    return start + offset;
+static unsigned get_bitstring_index(const unsigned char zoom, const int deltax, const int deltay, const player_t player, const unsigned char links) {
+    const int deltax_shift = deltax+zoom;
+    const int deltay_shift = deltay+zoom;
+    const int D0 = 1 + 2 * zoom;
+    constexpr int D1 = 3;
+    constexpr int D2 = 256;
+    return ((deltax_shift * D0 + deltay_shift) * D1 + player) * D2 + links;
 }
 
-size_t get_bitstring_index(int8_t deltax, int8_t deltay, player_t player, uint8_t links) {
-    assert(player == 1 || player == 2);
-
-    const size_t pos_index = get_position_index(deltax, deltay);
-    const size_t player_bit = player - 1;
-
-    const size_t index = (pos_index * 2 + player_bit) * 256 + links;
-
-    return index;
-}
-uint64_t hash(position_t pos, const board_t *board, uint8_t zoom, const uint64_t *bitstrings)
+uint64_t hash(const position_t pos, const board_t *board, const unsigned char zoom, const uint64_t *bitstrings)
 {
     uint64_t ret = 0;
-    for (int8_t i = -((int8_t) zoom); i <= ((int8_t) zoom); i++) {
-        for (int8_t j = -((int8_t) zoom); j <= ((int8_t) zoom); j++) {
+    for (int i = -zoom;i<=zoom;i++) {
+        for (int j = -zoom;j<=zoom;j++) {
             if (abs(i) + abs(j) > zoom) continue;
-            node_t *peek = twixt_peek({pos.x + i, pos.y + j}, board);
-            ret ^= bitstrings[get_bitstring_index(i, j, peek->player, peek->links)];
+            position_t p = {.x=pos.x + i, .y=pos.y + j};
+            if (0 > p.x || 0 > p.y || p.x >= board->size || p.y >= board->size) continue;
+            node_t *peek = twixt_peek(p, board);
+            ret ^= bitstrings[get_bitstring_index(zoom, i, j, peek->player, peek->links)];
         }
     }
     return ret;
 }
 
 typedef struct observation_s {
-    uint bv; // visited (black)
-    uint bc; // chosen (black)
-    uint rv; // visited (red)
-    uint rc; // chosen (red)
+    unsigned int bv; // visited (black)
+    unsigned int bc; // chosen (black)
+    unsigned int rv; // visited (red)
+    unsigned int rc; // chosen (red)
 } observation_t;
 
 typedef struct zobrist_s {
-    size_t nt;
-    uint8_t zc;
+    unsigned int nt;
+    unsigned char zc;
     observation_t **observations; // first array : per zoom level, second : every observation (by-hash)
     uint64_t **zoom_bitstrings;
-
 } zobrist_t;
 
-zobrist_t *zobrist_create(int nt, int zoom_count) {
+zobrist_t *zobrist_create(const unsigned nt, const unsigned zoom_count) {
     zobrist_t *zobrist = malloc(sizeof(zobrist_t));
     if (zobrist == NULL) return NULL;
     zobrist->zc = zoom_count;
     zobrist->nt = nt;
     zobrist->observations = malloc(zoom_count * sizeof(observation_t *));
     if (zobrist->observations == NULL) return NULL;
-    zobrist->zoom_bitstrings = malloc(zoom_count * sizeof(uint64_t*));
+    zobrist->zoom_bitstrings = malloc(zoom_count * sizeof(uint64_t *));
     if (zobrist->zoom_bitstrings == NULL) return NULL;
-    for (int i = 1; i <= zoom_count; i++) {
-        zobrist->observations[i] = malloc(nt * sizeof(observation_t));
+    for (unsigned i = 0; i < zoom_count; i++) {
+        zobrist->observations[i] = calloc(nt, sizeof(observation_t));
         zobrist->zoom_bitstrings[i] = make_bitstrings(i);
     }
     return zobrist;
@@ -94,30 +77,33 @@ zobrist_t *zobrist_create(int nt, int zoom_count) {
 
 void zobrist_free(zobrist_t **zobrist) {
     if (zobrist == NULL || *zobrist == NULL) return;
-    for (int i =  0;i<(*zobrist)->zc; i++) {
+    for (unsigned i =  0;i<(*zobrist)->zc; i++) {
         free((*zobrist)->observations[i]);
         free((*zobrist)->zoom_bitstrings[i]);
     }
+    free((*zobrist)->observations);
+    free((*zobrist)->zoom_bitstrings);
     free(*zobrist);
     *zobrist = NULL;
 }
 
-float zobrist_evaluate(const zobrist_t *zobrist, position_t position, player_t player, const board_t *board) {
+float zobrist_evaluate(const zobrist_t *zobrist, const position_t position, const player_t player, const board_t *board) {
     assert(player != NONE);
     assert(board != NULL);
     assert(zobrist != NULL);
-    for (int zoom = zobrist->zc; zoom > 0; zoom--) {
-        uint64_t current_hash = hash(position, board, zoom, zobrist->zoom_bitstrings[zoom]);
-        observation_t *observation = zobrist->observations[current_hash % zobrist->nt];
-        if (player == BLACK && observation->bv != 0) {
-            return (float) observation->bc / (float) observation->bv;
+    for (unsigned zoom = zobrist->zc; zoom > 0; zoom--) {
+        uint64_t current_hash = hash(position, board, zoom, zobrist->zoom_bitstrings[zoom-1]);
+        observation_t observation = zobrist->observations[zoom-1][current_hash % zobrist->nt];
+        printf("bv=%d,bc=%d,rv=%d,rc=%d\n",observation.bv, observation.bc, observation.rv, observation.rc);
+        if (player == BLACK && observation.bv != 0) {
+            return (float) observation.bc / (float) observation.bv;
         }
 
-        if (player == RED && observation->rv != 0) {
-            return (float) observation->rc / (float) observation->rv;
+        if (player == RED && observation.rv != 0) {
+            return (float) observation.rc / (float) observation.rv;
         }
     }
-    assert(false); // should not happen, very weird bug
+    return .0f;
 }
 
 void zobrist_populate(const zobrist_t *zobrist, const game_t *game) {
@@ -127,114 +113,106 @@ void zobrist_populate(const zobrist_t *zobrist, const game_t *game) {
     while (move != NULL) {
         if (move->type == SWAP) {
             twixt_swap(board);
+            move = move->next;
+            continue;
         }
         if (move->type != PEG) {
             move = move->next;
             continue;
-        };
-        twixt_play(board, move->player, move->peg);
-        if (move->next == NULL || move->next->type != PEG) {
-            move = move->next->next;
-            continue;
         }
-        for (int zoom = zobrist->zc; zoom > 0; zoom--) {
-            uint64_t current_hash = hash(move->peg,board, zoom, zobrist->zoom_bitstrings[zoom]);
-            observation_t obs = zobrist->observations[zoom][current_hash % zobrist->nt];
-            if (move->player == BLACK) obs.rv++;
-            if (move->player == RED) obs.bv++;
-            if (move->next->player == BLACK) obs.bc++;
-            if (move->next->player == RED) obs.rc++;
 
+        for (unsigned zoom = zobrist->zc; zoom > 0; zoom--) {
+            for (int i = 0;i<game->size;i++) {
+                for (int j = 0;j<game->size;j++) {
+                    position_t p = {i,j};
+                    node_t *peek = twixt_peek(p, board);
+                    if (peek->player != NONE) continue;
+                    uint64_t current_hash = hash(p, board, zoom-1, zobrist->zoom_bitstrings[zoom-1]);
+                    observation_t *obs = &zobrist->observations[zoom-1][current_hash % zobrist->nt];
+                    if (move->player == BLACK) obs->rv++;
+                    if (move->player == RED) obs->bv++;
+                    if (move->next != NULL && move->next->peg.x == p.x && move->next->peg.y == p.y) {
+                        if (move->next->player == BLACK) {
+                            obs->bv++;
+                            obs->rc++;
+                        }
+                        if (move->next->player == RED) {
+                            obs->rv++;
+                            obs->bc++;
+                        }
+                    }
+                }
+            }
         }
-        twixt_play(board, move->next->player, move->next->peg);
-        move = move->next->next;
+
+        twixt_play(board, move->player, move->peg);
+        move = move->next;
     }
     twixt_free(&board);
 }
-char *zobrist_serialize(const zobrist_t *zobrist) { // TODO : à tester
+
+
+
+void bytes_write(unsigned char **cur, const void *src, size_t size) {
+    memcpy(*cur, src, size);
+    *cur += size;
+}
+
+void observation_serialize(unsigned char **cur, const observation_t observation) {
+    bytes_write(cur, &observation.bv, sizeof(unsigned int));
+    bytes_write(cur, &observation.bc, sizeof(unsigned int));
+    bytes_write(cur, &observation.rv, sizeof(unsigned int));
+    bytes_write(cur, &observation.rc, sizeof(unsigned int));
+}
+
+observation_t observation_deserialize(const unsigned int *buf) {
+    assert(buf != NULL);
+    observation_t observation;
+    observation.bv = buf[0];
+    observation.bc = buf[1];
+    observation.rv = buf[2];
+    observation.rc = buf[3];
+    return observation;
+}
+
+unsigned char *zobrist_serialize(const zobrist_t *zobrist, unsigned long *length) {
     assert(zobrist != NULL);
-    size_t total_size = sizeof(uint64_t) + sizeof(uint8_t);
-
-    for (uint8_t i = 0; i < zobrist->zc; i++) {
-        total_size += zobrist->nt * sizeof(observation_t);
+    *length = sizeof(unsigned int) + sizeof(unsigned char) + 4 * sizeof(unsigned int) *  zobrist->nt * zobrist->zc;
+    unsigned char *buffer = malloc(*length);
+    unsigned char *cur = buffer;
+    bytes_write(&cur, &zobrist->nt, sizeof(unsigned int));
+    bytes_write(&cur, &zobrist->zc, sizeof(unsigned char));
+    for (unsigned char zoom = 0; zoom < zobrist->zc; zoom++) {
+        for (unsigned int t = 0; t < zobrist->nt; t++) {
+            observation_serialize(&cur, zobrist->observations[zoom][t]);
+        }
     }
-
-    char *buffer = malloc(total_size+1);
-    if (!buffer) return NULL;
-
-    char *p = buffer;
-
-    memcpy(p, &zobrist->nt, sizeof(zobrist->nt));
-    p += sizeof(zobrist->nt);
-
-    memcpy(p, &zobrist->zc, sizeof(zobrist->zc));
-    p += sizeof(zobrist->zc);
-
-    for (uint8_t i = 0; i < zobrist->zc; i++) {
-        memcpy(p, zobrist->observations[i], zobrist->nt * sizeof(observation_t));
-        p += zobrist->nt * sizeof(observation_t);
-    }
-
-    *p = '\0';
     return buffer;
 }
-zobrist_t *zobrist_deserialize(char *buf) {
-    if (!buf) return NULL;
 
-    char *p = buf;
+zobrist_t *zobrist_deserialize(unsigned char *buf, unsigned long length) {
+    unsigned char *cur = buf;
+    unsigned char *end = buf+length;
+    unsigned int nt;
+    unsigned char zc;
+    if (cur + sizeof(unsigned int) > end) return NULL;
+    memcpy(&nt, cur, sizeof(unsigned int));
+    cur += sizeof(unsigned int);
+    if (cur + sizeof(unsigned char) > end) return NULL;
+    memcpy(&zc, cur, sizeof(unsigned char));
+    zobrist_t *zobrist = zobrist_create(nt, zc);
 
-    uint64_t nt;
-    char *o = strncpy((char*)&nt, p, sizeof(nt));
-    p += sizeof(nt);
-    if (o != p) return NULL;
-
-    uint8_t zc;
-    o = strncpy((char*)&zc, p, sizeof(zc));
-    p += sizeof(zc);
-    if (o != p) return NULL;
-
-    zobrist_t *z = malloc(sizeof(zobrist_t));
-    if (!z) return NULL;
-    z->nt = nt;
-    z->zc = zc;
-
-    z->observations = malloc(zc * sizeof(observation_t*));
-    z->zoom_bitstrings = malloc(zc * sizeof(uint64_t*));
-    if (!z->observations || !z->zoom_bitstrings) {
-        free(z->observations);
-        free(z->zoom_bitstrings);
-        free(z);
-        return NULL;
-    }
-
-    for (uint8_t i = 0; i < zc; i++) { // TODO : s'assurer que c'est **safe**
-        z->observations[i] = malloc(nt * sizeof(observation_t));
-        if (!z->observations[i]) {
-            for (uint8_t j = 0; j < i; j++) free(z->observations[j]);
-            free(z->observations);
-            free(z->zoom_bitstrings);
-            free(z);
-            return NULL;
-        }
-        o = strncpy((char*)z->observations[i], p, nt * sizeof(observation_t));
-        p += nt * sizeof(observation_t);
-        if (o != p) {
-            for (uint8_t j = 0; j <= i; j++) free(z->observations[j]);
-            free(z->observations);
-            for (uint8_t j = 0; j < i; j++) free(z->zoom_bitstrings[j]);
-            free(z->zoom_bitstrings);
-            free(z);
-            return NULL;
-        }
-        z->zoom_bitstrings[i] = make_bitstrings(i);
-        if (!z->zoom_bitstrings[i]) {
-            for (uint8_t j = 0; j <= i; j++) free(z->observations[j]);
-            free(z->observations);
-            for (uint8_t j = 0; j < i; j++) free(z->zoom_bitstrings[j]);
-            free(z->zoom_bitstrings);
-            free(z);
-            return NULL;
+    cur += sizeof(unsigned char);
+    for (unsigned char zoom = 0;zoom<zobrist->zc;zoom++) {
+        for (unsigned int t = 0; t < zobrist->nt; t++) {
+            if (cur + 4 * sizeof(unsigned int) > end) {
+                zobrist_free(&zobrist);
+                return NULL;
+            }
+            observation_t observation = observation_deserialize((unsigned int *)cur);
+            cur += 4 * sizeof(unsigned int);
+            zobrist->observations[zoom][t] = observation;
         }
     }
-    return z;
+    return zobrist;
 }
