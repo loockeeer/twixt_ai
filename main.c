@@ -251,7 +251,6 @@ int main(int argc, char *argv[]) {
         int j = 69;
         while (fgets(line, sizeof(line), file)) {
             game = game_deserialize(line);
-            if (i > 100) break;
             if (game == NULL) {
                 printf("[PAR][ERROR] [line=%d][gid=?][step=0] failed : %s\n", i, line);
             } else {
