@@ -242,7 +242,7 @@ int main(int argc, char *argv[]) {
     } else if (strcmp("gen_zobrist", argv[1]) == 0) {
         zobrist_t *zobrist = zobrist_create(256, 20);
 
-        FILE *file = fopen("/home/lucas/CLionProjects/twixt_ai/twixtlive_games.bin", "r");
+        FILE *file = fopen("./twixtlive_games.bin", "r");
 
         char line[10000];
         game_t *game;
