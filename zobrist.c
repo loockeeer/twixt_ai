@@ -94,7 +94,6 @@ float zobrist_evaluate(const zobrist_t *zobrist, const position_t position, cons
     for (unsigned zoom = zobrist->zc; zoom > 0; zoom--) {
         uint64_t current_hash = hash(position, board, zoom, zobrist->zoom_bitstrings[zoom-1]);
         observation_t observation = zobrist->observations[zoom-1][current_hash % zobrist->nt];
-        printf("bv=%d,bc=%d,rv=%d,rc=%d\n",observation.bv, observation.bc, observation.rv, observation.rc);
         if (player == BLACK && observation.bv != 0) {
             return (float) observation.bc / (float) observation.bv;
         }
@@ -104,6 +103,28 @@ float zobrist_evaluate(const zobrist_t *zobrist, const position_t position, cons
         }
     }
     return .0f;
+}
+
+position_t zobrist_best_move(const zobrist_t *zobrist, const player_t player, const board_t *board) {
+    assert(player != NONE);
+    assert(board != NULL);
+    assert(zobrist != NULL);
+    position_t best_pos = {0,0};
+    float best_score = 0.0f;
+    int count;
+    bool *moves = twixt_available_moves(board, player, &count);
+    for (int i = 0; i < twixt_size(board); i++) {
+        for (int j = 0; j < twixt_size(board); j++) {
+            if (!moves[twixt_size(board) * j + i]) continue;
+            position_t current = {i,j};
+            float score = zobrist_evaluate(zobrist, current, player, board);
+            if (score > best_score) {
+                best_pos = current;
+                best_score = score;
+            }
+        }
+    }
+    return best_pos;
 }
 
 void zobrist_populate(const zobrist_t *zobrist, const game_t *game) {
